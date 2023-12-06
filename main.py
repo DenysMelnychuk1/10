@@ -1,28 +1,43 @@
 from collections import UserDict
+from datetime import datetime, timedelta
 
 class Field:
     def __init__(self, value):
+        self.__value = None
         self.value = value
-
+    @property
+    def value(self):
+        return self.__value
+    @value.setter
+    def value(self,  value):
+            self.__value = value
     def __str__(self):
         return str(self.value)
-
 class Name(Field):
     pass
-
 class Phone(Field):
     def __init__(self, value):
         super().__init__(value)
-        self.validate()
+    @Field.value.setter
+    def value(self, value):
+        if value.isdigit() and len(value) == 10:
+            self._Field__value = value
+            
+        else:
+            raise ValueError ('Invalid number')
 
-    def validate(self):
-        if not (isinstance(self.value, str) and self.value.isdigit() and len(self.value) == 10):
-            raise ValueError("Phone number must be a 10-digit string")
+class Birthday(Field):
+    def validate(self, value):
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Invalid birthday format. Use YYYY-MM-DD")
 
 class Record:
-    def __init__(self, name):
+    def __init__(self, name, birthday=None):
         self.name = Name(name)
         self.phones = []
+        self.birthday = Birthday(birthday) if birthday else None
 
     def add_phone(self, phone):
         new_phone = Phone(phone)
@@ -44,9 +59,23 @@ class Record:
                 return p
         return None
 
+    def days_to_birthday(self):
+        if not self.birthday:
+            return None
+
+        today = datetime.now()
+        next_birthday = datetime(today.year, self.birthday.value.month, self.birthday.value.day)
+
+        if today > next_birthday:
+            next_birthday = datetime(today.year + 1, self.birthday.value.month, self.birthday.value.day)
+
+        days_remaining = (next_birthday - today).days
+        return days_remaining
+
     def __str__(self):
         phone_str = '; '.join(str(p) for p in self.phones)
-        return f"Contact name: {self.name}, phones: {phone_str}"
+        birthday_str = f", birthday: {self.birthday}" if self.birthday else ""
+        return f"Contact name: {self.name}{birthday_str}, phones: {phone_str}"
 
 class AddressBook(UserDict):
     def add_record(self, record):
@@ -58,3 +87,8 @@ class AddressBook(UserDict):
     def delete(self, name):
         if name in self.data:
             del self.data[name]
+
+    def iterator(self, batch_size=5):
+        records = list(self.data.values())
+        for i in range(0, len(records), batch_size):
+            yield records[i:i+batch_size]
